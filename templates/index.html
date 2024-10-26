@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cricket Match Winning Probability Estimator</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <style>
+        /* Add some basic styling for the table */
+        .container {
+            max-width: 1200px; /* Set a maximum width for the container */
+            margin: 0 auto; /* Center the container */
+            padding: 20px; /* Add some padding */
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1); /* Optional shadow for aesthetics */
+            border-radius: 10px; /* Optional rounded corners for aesthetics */
+        }
+    
+        table {
+            width: 100%; /* Make the table fill the width of its container */
+            border-collapse: collapse; /* Merge borders */
+            margin-top: 20px; /* Space above the table */
+            table-layout: fixed; /* Prevent overflow by fixing column widths */
+            overflow: hidden; /* Prevent content overflow */
+        }
+    
+        th, td {
+            border: 1px solid #ddd; /* Table cell border */
+            padding: 8px; /* Padding inside cells */
+            text-align: left; /* Left align text */
+            word-wrap: break-word; /* Break long words */
+        }
+    
+        th {
+            background-color: #f2f2f2; /* Header background color */
+        }
+    
+        /* Responsive adjustments */
+        @media screen and (max-width: 768px) {
+            table {
+                display: block; /* Make table responsive */
+                overflow-x: auto; /* Allow horizontal scrolling */
+                white-space: nowrap; /* Prevent wrapping */
+            }
+        }
+    </style>
+    
+</head>
+<body>
+    <div class="container">
+        <h1>Cricket Match Winning Probability Estimator</h1>
+        <form id="probability-form">
+            <label for="batting_team">Select Team A:</label>
+            <select id="batting_team" required>
+                <option value="">--Select Team--</option>
+                <option value="Mumbai Indians">Mumbai Indians</option>
+                <option value="Chennai Super Kings">Chennai Super Kings</option>
+                <option value="Royal Challengers Bengaluru">Royal Challengers Bengaluru</option>
+                <option value="Sunrisers Hyderabad">Sunrisers Hyderabad</option>
+                <option value="Kolkata Knight Riders">Kolkata Knight Riders</option>
+                <option value="Punjab Kings">Punjab Kings</option>
+                <option value="Rajasthan Royals">Rajasthan Royals</option>
+                <option value="Delhi Capitals">Delhi Capitals</option>
+            </select>
+
+            <label for="bowling_team">Select Team B:</label>
+            <select id="bowling_team" required>
+                <option value="">--Select Team--</option>
+                <option value="Mumbai Indians">Mumbai Indians</option>
+                <option value="Chennai Super Kings">Chennai Super Kings</option>
+                <option value="Royal Challengers Bengaluru">Royal Challengers Bengaluru</option>
+                <option value="Sunrisers Hyderabad">Sunrisers Hyderabad</option>
+                <option value="Kolkata Knight Riders">Kolkata Knight Riders</option>
+                <option value="Punjab Kings">Punjab Kings</option>
+                <option value="Rajasthan Royals">Rajasthan Royals</option>
+                <option value="Delhi Capitals">Delhi Capitals</option>
+            </select>
+
+            <h3>Second Innings</h3>
+            <label for="target">Target:</label>
+            <input type="number" id="target" min="1" required>
+
+            <label for="score">Score:</label>
+            <input type="number" id="score" min="0" required>
+
+            <label for="overs">Overs Completed:</label>
+            <input type="number" id="overs" min="0" max="20" required>
+
+            <label for="wickets">Wickets Out:</label>
+            <input type="number" id="wickets" min="0" max="10" required>
+
+            <button type="submit">Predict Probability</button>
+        </form>
+
+        <div id="results" style="display:none;">
+            <h2>Results</h2>
+            <p id="batting_team_probability"></p>
+            <p id="bowling_team_probability"></p>
+            <h3>Closest Scenarios:</h3>
+            <table id="scenarios-table">
+                <thead>
+                    <tr>
+                        <th>Batting Team</th>
+                        <th>Bowling Team</th>
+                        <th>Team Batting First</th>
+                        <th>Run Scored</th>
+                        <th>Wicket Fallen</th>
+                        <th>Overs Completed</th>
+                        <th>Runs Still Required</th>
+                        <th>Winning Team</th>
+                    </tr>
+                </thead>
+                <tbody id="scenarios"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('probability-form').addEventListener('submit', function (event) {
+            // Prevent default form submission
+            event.preventDefault();
+
+            // Get values from the form
+            const batting_team = document.getElementById('batting_team').value;
+            const bowling_team = document.getElementById('bowling_team').value;
+
+            // Validate team selection
+            if (batting_team === bowling_team) {
+                alert("Both teams can't be the same. Please select different teams.");
+                return; // Stop the form submission
+            }
+
+            const target = parseInt(document.getElementById('target').value);
+            const score = parseInt(document.getElementById('score').value);
+            const overs = parseFloat(document.getElementById('overs').value);
+            const wickets = parseInt(document.getElementById('wickets').value);
+
+            // Send data to the server
+            fetch('/estimate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    batting_team: batting_team,
+                    bowling_team: bowling_team,
+                    target: target,
+                    score: score,
+                    overs: overs,
+                    wickets: wickets
+                }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('batting_team_probability').innerText = 
+                    `${batting_team} Winning Probability: ${data.batting_team_probability}%`;
+                document.getElementById('bowling_team_probability').innerText = 
+                    `${bowling_team} Winning Probability: ${data.bowling_team_probability}%`;
+
+                const scenariosList = document.getElementById('scenarios');
+                scenariosList.innerHTML = ''; // Clear previous scenarios
+
+                // Populate the table with scenarios
+                data.closest_scenarios.forEach(scenario => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${scenario.batting_team}</td>
+                        <td>${scenario.bowling_team}</td>
+                        <td>${scenario.batting_team}</td>
+                        <td>${scenario.total_runs}</td>
+                        <td>${scenario.wickets_fallen}</td>
+                        <td>${scenario.overs_completed}</td>
+                        <td>${scenario.runs_required}</td>
+                        <td>${scenario.winning_team}</td>
+                    `;
+                    scenariosList.appendChild(row);
+                });
+
+                document.getElementById('results').style.display = 'block';
+            })
+            .catch(error => console.error('Error:', error));
+        });
+    </script>
+</body>
+</html>
